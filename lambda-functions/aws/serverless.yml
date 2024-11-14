@@ -1,0 +1,89 @@
+# "org" ensures this Service is used with the correct Serverless Framework Access Key.
+org: murkel
+# "app" enables Serverless Framework Dashboard features and sharing them with other Services.
+app: hissellerdiss-api
+# "service" is the name of this project. This will also be added to your AWS resource names.
+service: aws-service
+
+# stages
+stages:
+  default:
+    params:
+      tableName: "hissellerdiss-table"
+      userProfile: sls-user
+
+# provider settings
+provider:
+  region: eu-north-1
+  name: aws
+  profile: ${param:userProfile}
+  runtime: nodejs20.x
+  architecture: arm64
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            # - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            # - dynamodb:DeleteItem
+          Resource:
+            - Fn::GetAtt: [itemsTable, Arn]
+        - Effect: Allow
+          Action:
+            - lambda:InvokeFunction
+          Resource: "*"
+  environment:
+    ITEMS_TABLE: ${param:tableName}
+    HED_TABLE_NAME: "HISSELLERDISS"
+    HED_USERS_TABLE_NAME: "HISSELLERDISS_USERS"
+
+functions:
+  getitems:
+    handler: ./src/functions/get/getAllItems.handler
+    events:
+      - httpApi:
+          path: /getitems
+          method: get
+  getitembyid:
+    handler: ./src/functions/get/getItemById.handler
+    events:
+      - httpApi:
+          path: /getitem/{id}
+          method: get
+  createitem:
+    handler: ./src/functions/post/createItem.handler
+    events:
+      - httpApi:
+          path: /createItem
+          method: post
+
+  # below this line, all functions require API key.
+  dbCreateitem:
+    handler: ./src/functions/backend/dbCreateItem.handler
+    events:
+      - httpApi:
+          path: /dbCreateItem
+          method: post
+
+
+resources:
+  Resources:
+    itemsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: pk
+            AttributeType: S
+          - AttributeName: sk
+            AttributeType: S
+        KeySchema:
+          - AttributeName: pk
+            KeyType: HASH
+          - AttributeName: sk
+            KeyType: RANGE
+        BillingMode: PAY_PER_REQUEST
+        TableName: ${param:tableName}

@@ -1,0 +1,19 @@
+{
+  "name": "aws",
+  "version": "1.0.0",
+  "description": "",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.585.0",
+    "@aws-sdk/lib-dynamodb": "^3.585.0",
+    "express": "^4.21.1",
+    "serverless-http": "^3.2.0",
+    "uuid": "^11.0.3"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.145",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.9.0",
+    "serverless-plugin-typescript": "^2.1.5",
+    "typescript": "^5.6.3"
+  }
+}
