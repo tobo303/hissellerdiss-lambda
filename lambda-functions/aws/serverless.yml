@@ -1,24 +1,36 @@
+# read .env file
+useDotenv: true
 # "org" ensures this Service is used with the correct Serverless Framework Access Key.
 org: murkel
 # "app" enables Serverless Framework Dashboard features and sharing them with other Services.
-app: hissellerdiss-api
+app: ${env:AWS_APP_NAME}
 # "service" is the name of this project. This will also be added to your AWS resource names.
-service: aws-service
+service: ${env:AWS_SERVICE_NAME}
 
 # stages
 stages:
-  default:
+  # production environment
+  prod:
+    environment:
+      stage: prod
     params:
-      tableName: "hissellerdiss-table"
-      userProfile: sls-user
+      tableName: ${env:ITEMS_TABLE}
+
+  # default stage, it defaults to dev
+  default:
+    environment:
+      stage: dev
+    params:
+      tableName: ${env:ITEMS_TABLE}
 
 # provider settings
 provider:
-  region: eu-north-1
   name: aws
-  profile: ${param:userProfile}
+  region: ${env:HISSELLERDISS_REGION}
+  profile: ${env:USER_PROFILE}
   runtime: nodejs20.x
   architecture: arm64
+  memorySize: 1024
   iam:
     role:
       statements:
@@ -35,43 +47,89 @@ provider:
         - Effect: Allow
           Action:
             - lambda:InvokeFunction
+            - lambda:InvokeAsync
           Resource: "*"
-  environment:
-    ITEMS_TABLE: ${param:tableName}
-    HED_TABLE_NAME: "HISSELLERDISS"
-    HED_USERS_TABLE_NAME: "HISSELLERDISS_USERS"
+        - Effect: Deny
+          Action:
+            - lambda:InvokeFunction
+            - lambda:InvokeAsync
+          Resource:
+            - arn:aws:lambda:${env:HISSELLERDISS_REGION}:${env:HISSELLERDISS_ACCOUNT_ID}:function:${self:service}-${sls:stage}-dbCreateItem
+            - arn:aws:lambda:${env:HISSELLERDISS_REGION}:${env:HISSELLERDISS_ACCOUNT_ID}:function:${self:service}-${sls:stage}-dbReadItems
+  # httpApi:
+  #   authorizers:
+  #     user-authorizer:
+  #       type: request
+  #       functionName: hissUserAuthorizer
+  #       resultTtlInSeconds: ${env:USER_AUTH_TIMEOUT}
 
+# lambda functions
 functions:
   getitems:
-    handler: ./src/functions/get/getAllItems.handler
+    handler: ./src/functions/get/fetchItems.getItems
     events:
       - httpApi:
           path: /getitems
           method: get
   getitembyid:
-    handler: ./src/functions/get/getItemById.handler
+    handler: ./src/functions/get/fetchItems.getItemById
     events:
       - httpApi:
           path: /getitem/{id}
           method: get
   createitem:
+    role: allowLambdaToAssumeRoleInternal
     handler: ./src/functions/post/createItem.handler
     events:
       - httpApi:
           path: /createItem
           method: post
 
-  # below this line, all functions require API key.
-  dbCreateitem:
+  # below this line all functions are internal and locked down.
+  dbCreateItem:
     handler: ./src/functions/backend/dbCreateItem.handler
     events:
       - httpApi:
           path: /dbCreateItem
           method: post
-
+  dbReadItems:
+    handler: ./src/functions/backend/dbReader.getAllItems
+    events:
+      - httpApi:
+          path: /dbReadItems
+          method: get
+  
+  # hissUserAuthorizer:
+  #   handler: ./src/functions/authorizer/userAuth.handler
 
 resources:
   Resources:
+    allowLambdaToAssumeRoleInternal:
+      Type: AWS::IAM::Role
+      Properties:
+        Path: /hissellerdiss/lambda-internal/
+        RoleName: lambda-internal-role
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: sts:AssumeRole          
+        Policies:
+          - PolicyName: allowExecutionFromToLambda
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                  - lambda:InvokeAsync
+                Resource:
+                  - arn:aws:lambda:${env:HISSELLERDISS_REGION}:${env:HISSELLERDISS_ACCOUNT_ID}:function:${self:service}-${sls:stage}-dbCreateItem
+                  - arn:aws:lambda:${env:HISSELLERDISS_REGION}:${env:HISSELLERDISS_ACCOUNT_ID}:function:${self:service}-${sls:stage}-dbReadItems
+    # DynamoDB Table
     itemsTable:
       Type: AWS::DynamoDB::Table
       Properties:
@@ -85,5 +143,5 @@ resources:
             KeyType: HASH
           - AttributeName: sk
             KeyType: RANGE
-        BillingMode: PAY_PER_REQUEST
+        BillingMode: PAY_PER_REQUEST 
         TableName: ${param:tableName}

@@ -8,12 +8,20 @@ const lambdaClient = new LambdaClient({});
 export const handler: Handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
     const item = JSON.parse(event.body || '{}') as CreateItemRequest;
 
-    const invokeParams = {
-      FunctionName: 'aws-service-dev-dbCreateitem',
-      InvocationType: InvocationType.RequestResponse,
-      Payload: JSON.stringify(item)
-    };
+    // const invokeParams = {
+    //   FunctionName: 'aws-service-dev-dbCreateitem',
+    //   InvocationType: InvocationType.RequestResponse,
+    //   Payload: JSON.stringify(item)
+    // };
   
+    const invokeParams = {
+      FunctionName: 'aws-service-dev-dbCreateItem',
+      InvocationType: InvocationType.RequestResponse,
+      Payload: JSON.stringify(item),
+      Qualifier: '1',
+    //   ClientContext: Buffer.from(JSON.stringify({ apiKey: 'your-api-key' })).toString('base64')
+    };
+
     const response = await lambdaClient.send(new InvokeCommand(invokeParams));
 
     if (!response.Payload || response.StatusCode !== 200) {
