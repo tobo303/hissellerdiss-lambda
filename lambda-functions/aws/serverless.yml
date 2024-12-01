@@ -65,50 +65,51 @@ provider:
 
 # lambda functions
 functions:
-  getitems:
-    handler: ./src/functions/get/fetchItems.getItems
+  getItems:
+    role: allowLambdaReadRights
+    handler: ./src/functions/get/getItems.handler
     events:
       - httpApi:
-          path: /getitems
+          path: /${env:HED_API_PATH}/getItems
           method: get
-  getitembyid:
-    handler: ./src/functions/get/fetchItems.getItemById
+  getItemsTestPolicy:
+    handler: ./src/functions/get/getItems.handler
     events:
       - httpApi:
-          path: /getitem/{id}
+          path: /${env:HED_API_PATH}/getItemsTestPolicy
+          method: get
+  getItembyid:
+    role: allowLambdaReadRights
+    handler: ./src/functions/get/getItemById.handler
+    events:
+      - httpApi:
+          path: /${env:HED_API_PATH}/getItems/{id}
           method: get
   createitem:
-    role: allowLambdaToAssumeRoleInternal
+    role: allowLambdaWriteRights
     handler: ./src/functions/post/createItem.handler
     events:
       - httpApi:
-          path: /createItem
+          path: /${env:HED_API_PATH}/createItem
           method: post
 
   # below this line all functions are internal and locked down.
   dbCreateItem:
     handler: ./src/functions/backend/dbCreateItem.handler
-    events:
-      - httpApi:
-          path: /dbCreateItem
-          method: post
   dbReadItems:
     handler: ./src/functions/backend/dbReader.getAllItems
-    events:
-      - httpApi:
-          path: /dbReadItems
-          method: get
   
   # hissUserAuthorizer:
   #   handler: ./src/functions/authorizer/userAuth.handler
 
 resources:
   Resources:
-    allowLambdaToAssumeRoleInternal:
+    # Allow access to the lambda functions that write to the database
+    allowLambdaWriteRights:
       Type: AWS::IAM::Role
       Properties:
         Path: /hissellerdiss/lambda-internal/
-        RoleName: lambda-internal-role
+        RoleName: lambda-internal-role-write
         AssumeRolePolicyDocument:
           Version: "2012-10-17"
           Statement:
@@ -128,7 +129,33 @@ resources:
                   - lambda:InvokeAsync
                 Resource:
                   - arn:aws:lambda:${env:HISSELLERDISS_REGION}:${env:HISSELLERDISS_ACCOUNT_ID}:function:${self:service}-${sls:stage}-dbCreateItem
+
+    # Allow access to invoke the lambda function that reads from the database
+    allowLambdaReadRights:
+      Type: AWS::IAM::Role
+      Properties:
+        Path: /hissellerdiss/lambda-internal/
+        RoleName: lambda-internal-role-read
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: sts:AssumeRole          
+        Policies:
+          - PolicyName: allowExecutionFromToLambda
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                  - lambda:InvokeAsync
+                Resource:
                   - arn:aws:lambda:${env:HISSELLERDISS_REGION}:${env:HISSELLERDISS_ACCOUNT_ID}:function:${self:service}-${sls:stage}-dbReadItems
+
     # DynamoDB Table
     itemsTable:
       Type: AWS::DynamoDB::Table

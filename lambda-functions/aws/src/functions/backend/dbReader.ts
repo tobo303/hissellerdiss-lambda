@@ -1,6 +1,8 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult, Handler } from 'aws-lambda';
+import { APIGateway } from 'aws-sdk';
 import { DynamoDB, QueryCommand } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocument } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocument, GetCommand, QueryCommandInput } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb"; // ES6 import
 import GetItemsResponse from '../../types/getItemsResponse';
 import { DB_NAME, HED_TABLE_NAME } from '../../globals';
 import dbItem from '../../types/dbItem';
@@ -8,50 +10,45 @@ import ItemDto from '../../types/ItemDto';
 import { StatusCodes } from '../../statusCodes';
 
 const client = new DynamoDB();
-const db = DynamoDBDocument.from(client);
+const db = DynamoDBDocument.from(client); // client is DynamoDB client
 
-export const getAllItems: Handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
-    // const authHeader = event.headers['Authorization'];
+export const getAllItems: Handler = async (): Promise<APIGatewayProxyResult> => {
 
-    // if (!authHeader) {
-    //     return {
-    //         statusCode: 401,
-    //         headers: {
-    //             "Content-Type": "application/json",
-    //         },
-    //         body: JSON.stringify({
-    //             message: "Unauthorized: Missing Authorization header"
-    //         }),
-    //     };
-    // }
+    const params : QueryCommandInput = {
+        TableName: DB_NAME,
+        KeyConditionExpression: "#b2050 = :b2050",
+        FilterExpression: "#b2051 = :b2051",
+        ExpressionAttributeValues: {
+            ":b2050": HED_TABLE_NAME,
+            ":b2051": false
+        },
+        ExpressionAttributeNames: {
+            "#b2050": "pk",
+            "#b2051": "isDeleted"
+        }
+    };
 
-    // const command = new QueryCommand({
-    //     TableName: DB_NAME,
-    //     KeyConditionExpression: 'pk = :pk AND isDeleted = :isDeleted AND sk = :sk',
-    //     ExpressionAttributeValues: { 
-    //         ':pk': { S: HED_TABLE_NAME },
-    //         ':isDeleted': { BOOL: false }
-    //     },
-    // });
+    const items = await db.query(params);
 
+    const mappedItems = items.Items?.map((item) => {
+        return {
+            sk: item.sk,
+            name: item.name,
+            description: item.description,
+            votes: item.votes,
+            isDeleted: item.isDeleted
+        } as ItemDto;
+    }) || [];
 
-
-    // const result = await db.get() .send(command);
-    // const items: ItemDto[] = result.Items?.map((item) => <ItemDto> {
-    //         sk: item.sk.S || '',
-    //         name: item.name.S || '',
-    //         description: item.description.S || '',
-    //         votes: item.votes.N ? parseInt(item.votes.N) : 0,
-    //         isDeleted: item.isDeleted.BOOL || false
-    // }) || [];
-
-    return {
-        statusCode: items.length > 0 ? StatusCodes.OK : StatusCodes.NO_CONTENT,
+    const response: APIGatewayProxyResult = {
+        statusCode: StatusCodes.OK,
         headers: {
             "Content-Type": "application/json",
         },
         body: JSON.stringify({
-            items
+            items: mappedItems
         }),
-    };
+    }
+
+    return response;
 };
