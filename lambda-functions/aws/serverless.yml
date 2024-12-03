@@ -31,6 +31,15 @@ provider:
   runtime: nodejs20.x
   architecture: arm64
   memorySize: 1024
+  httpApi:
+    cors:
+      allowedOrigins: "*"
+      allowedHeaders:
+        - Content-Type
+      allowedMethods:
+        - GET
+        - POST
+      maxAge: 6000 # In seconds  
   iam:
     role:
       statements:

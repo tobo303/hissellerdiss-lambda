@@ -1,0 +1,1 @@
+export const HED_API_BASE_URL = 'https://8ea8op22fc.execute-api.eu-north-1.amazonaws.com/';
