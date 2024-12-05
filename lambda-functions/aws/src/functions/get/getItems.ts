@@ -1,4 +1,4 @@
-import { APIGatewayProxyEvent, APIGatewayProxyResult, Handler } from 'aws-lambda';
+import { APIGatewayProxyResult, Handler } from 'aws-lambda';
 import { LambdaClient, InvokeCommand, InvocationType } from "@aws-sdk/client-lambda";
 
 import { StatusCodes } from '../../statusCodes';
@@ -7,15 +7,13 @@ const lambdaClient = new LambdaClient({
     region: 'eu-north-1'
 });
 
-export const handler: Handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+export const handler: Handler = async (): Promise<APIGatewayProxyResult> => {
 
     console.log("getItems function invoked");
 
     const invokeParams = {
         FunctionName: 'aws-service-dev-dbReadItems',
         InvocationType: InvocationType.RequestResponse,
-        // Qualifier: '1',
-      //   ClientContext: Buffer.from(JSON.stringify({ apiKey: 'your-api-key' })).toString('base64')
       };
 
     console.log("Invoking lambda function");

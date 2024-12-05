@@ -39,18 +39,14 @@ provider:
       allowedMethods:
         - GET
         - POST
+        - PUT
       maxAge: 6000 # In seconds  
   iam:
     role:
       statements:
-        - Effect: Allow
+        - Effect: Deny
           Action:
-            - dynamodb:Query
-            # - dynamodb:Scan
-            - dynamodb:GetItem
-            - dynamodb:PutItem
-            - dynamodb:UpdateItem
-            # - dynamodb:DeleteItem
+            - dynamodb:*
           Resource:
             - Fn::GetAtt: [itemsTable, Arn]
         - Effect: Allow
@@ -65,6 +61,8 @@ provider:
           Resource:
             - arn:aws:lambda:${env:HISSELLERDISS_REGION}:${env:HISSELLERDISS_ACCOUNT_ID}:function:${self:service}-${sls:stage}-dbCreateItem
             - arn:aws:lambda:${env:HISSELLERDISS_REGION}:${env:HISSELLERDISS_ACCOUNT_ID}:function:${self:service}-${sls:stage}-dbReadItems
+            - arn:aws:lambda:${env:HISSELLERDISS_REGION}:${env:HISSELLERDISS_ACCOUNT_ID}:function:${self:service}-${sls:stage}-dbReadItemById
+            - arn:aws:lambda:${env:HISSELLERDISS_REGION}:${env:HISSELLERDISS_ACCOUNT_ID}:function:${self:service}-${sls:stage}-dbUpdateItem
   # httpApi:
   #   authorizers:
   #     user-authorizer:
@@ -79,7 +77,7 @@ functions:
     handler: ./src/functions/get/getItems.handler
     events:
       - httpApi:
-          path: /${env:HED_API_PATH}/getItems
+          path: /${env:HED_API_PATH}/entries
           method: get
   getItemsTestPolicy:
     handler: ./src/functions/get/getItems.handler
@@ -92,22 +90,37 @@ functions:
     handler: ./src/functions/get/getItemById.handler
     events:
       - httpApi:
-          path: /${env:HED_API_PATH}/getItems/{id}
+          path: /${env:HED_API_PATH}/entries/{id}
           method: get
   createitem:
     role: allowLambdaWriteRights
     handler: ./src/functions/post/createItem.handler
     events:
       - httpApi:
-          path: /${env:HED_API_PATH}/createItem
+          path: /${env:HED_API_PATH}/entries
           method: post
+  updateitem:
+    role: allowLambdaWriteRights
+    handler: ./src/functions/post/updateItem.handler
+    events:
+      - httpApi:
+          path: /${env:HED_API_PATH}/entries/{id}
+          method: put
+
 
   # below this line all functions are internal and locked down.
   dbCreateItem:
+    role: allowDynamoWriteRights
     handler: ./src/functions/backend/dbCreateItem.handler
   dbReadItems:
+    role: allowDynamoReadRights
     handler: ./src/functions/backend/dbReader.getAllItems
-  
+  dbReadItemById:
+    role: allowDynamoReadRights
+    handler: ./src/functions/backend/dbReader.getItemById
+  dbUpdateItem:
+    role: allowDynamoReadWriteRights
+    handler: ./src/functions/backend/dbUpdateItem.handler
   # hissUserAuthorizer:
   #   handler: ./src/functions/authorizer/userAuth.handler
 
@@ -138,6 +151,106 @@ resources:
                   - lambda:InvokeAsync
                 Resource:
                   - arn:aws:lambda:${env:HISSELLERDISS_REGION}:${env:HISSELLERDISS_ACCOUNT_ID}:function:${self:service}-${sls:stage}-dbCreateItem
+                  - arn:aws:lambda:${env:HISSELLERDISS_REGION}:${env:HISSELLERDISS_ACCOUNT_ID}:function:${self:service}-${sls:stage}-dbUpdateItem
+          - PolicyName: allowLambdaWriteToLog
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+    # Allow access to the lambda functions that write to the database
+    allowDynamoWriteRights:
+      Type: AWS::IAM::Role
+      Properties:
+        Path: /hissellerdiss/dynamodb-internal/
+        RoleName: dynamodb-internal-role-write
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: sts:AssumeRole          
+        Policies:
+          - PolicyName: allowWriteRightsFromLambda
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                Resource:
+                  - Fn::GetAtt: [itemsTable, Arn]
+
+    # Allow access to the lambda function that reads from the database
+    allowDynamoReadRights:
+      Type: AWS::IAM::Role
+      Properties:
+        Path: /hissellerdiss/dynamodb-internal/
+        RoleName: dynamodb-internal-role-read
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: sts:AssumeRole          
+        Policies:
+          - PolicyName: allowReadRightsFromLambda
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                Effect: Allow
+                Action:
+                  - dynamodb:Query
+                  - dynamodb:GetItem
+                Resource:
+                  - Fn::GetAtt: [itemsTable, Arn]
+
+    allowDynamoReadWriteRights:
+      Type: AWS::IAM::Role
+      Properties:
+        Path: /hissellerdiss/dynamodb-internal/
+        RoleName: dynamodb-internal-role-read-write
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: sts:AssumeRole          
+        Policies:
+          - PolicyName: allowReadWriteRightsFromLambda
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                Effect: Allow
+                Action:
+                  - dynamodb:Query
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                Resource:
+                  - Fn::GetAtt: [itemsTable, Arn]
+          - PolicyName: allowWriteToLog
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+
 
     # Allow access to invoke the lambda function that reads from the database
     allowLambdaReadRights:
@@ -164,6 +277,8 @@ resources:
                   - lambda:InvokeAsync
                 Resource:
                   - arn:aws:lambda:${env:HISSELLERDISS_REGION}:${env:HISSELLERDISS_ACCOUNT_ID}:function:${self:service}-${sls:stage}-dbReadItems
+                  - arn:aws:lambda:${env:HISSELLERDISS_REGION}:${env:HISSELLERDISS_ACCOUNT_ID}:function:${self:service}-${sls:stage}-dbReadItemById
+
 
     # DynamoDB Table
     itemsTable:

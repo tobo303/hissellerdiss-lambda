@@ -1,29 +1,36 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult, Handler } from 'aws-lambda';
 import { LambdaClient, InvokeCommand, InvocationType } from "@aws-sdk/client-lambda";
 
-import { StatusCodes } from "../../statusCodes";
-import { GetItemByIdRequest } from '../../types/Requests/getItemByIdRequest';
+import { StatusCodes } from '../../statusCodes';
+import UpdateItemRequest from '../../types/Requests/updateItemRequest';
 
-const lambdaClient = new LambdaClient({
-    region: 'eu-north-1'
-});
+const lambdaClient = new LambdaClient({});
 
 export const handler: Handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
-    const item : GetItemByIdRequest = {id: event.pathParameters?.id || ""};
+    const item = JSON.parse(event.body || '{}') as UpdateItemRequest;
+    item.id = event.pathParameters?.id || "";
+    
+    console.log("patchItem function invoked with item: ", item);
 
-    console.log("getItems function invoked with id: ", item);
+    if (!item || !item.id) {
+        return {
+            statusCode: StatusCodes.BAD_REQUEST,
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                message: "Missing required fields (id): " + JSON.stringify(item),
+            }),
+        };
+    }
 
     const invokeParams = {
-        FunctionName: 'aws-service-dev-dbReadItemById',
-        InvocationType: InvocationType.RequestResponse,
-        Payload: JSON.stringify(item),
+      FunctionName: 'aws-service-dev-dbUpdateItem',
+      InvocationType: InvocationType.RequestResponse,
+      Payload: JSON.stringify(item),
     };
 
-    console.log("Invoking lambda function");
-
     const response = await lambdaClient.send(new InvokeCommand(invokeParams));
-
-    console.log("Response received");
 
     if (!response.Payload || response.StatusCode !== 200) {
         return {
@@ -35,10 +42,10 @@ export const handler: Handler = async (event: APIGatewayProxyEvent): Promise<API
                 message: "Internal Server Error: No valid response from the Lambda function",
             }),
         };
-    }  
+    }
 
     return {
-        statusCode: 200,
+        statusCode: StatusCodes.OK,
         headers: {
             "Content-Type": "application/json",
         },

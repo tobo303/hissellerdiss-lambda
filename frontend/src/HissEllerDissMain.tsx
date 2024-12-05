@@ -9,7 +9,7 @@ const HissEllerDissMain: React.FC = () => {
     return (
         <div>
             <HED_NavBar />
-            <div className='container-fluid'>
+            <div>
                 <HED_Entries />
             </div>
         </div>

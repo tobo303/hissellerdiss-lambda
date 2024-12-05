@@ -4,7 +4,7 @@ import { DynamoDBDocument } from '@aws-sdk/lib-dynamodb';
 import { v4 as uuidv4 } from 'uuid';
 
 import { StatusCodes } from '../../statusCodes';
-import CreateItemRequest from '../../types/createItemRequest';
+import CreateItemRequest from '../../types/Requests/createItemRequest';
 import dbItem from '../../types/dbItem';
 import { DB_NAME, HED_TABLE_NAME } from '../../globals';
 import ItemDto from '../../types/ItemDto';
@@ -13,19 +13,6 @@ const client = new DynamoDB();
 const db = DynamoDBDocument.from(client);
 
 export const handler: Handler = async (event: CreateItemRequest): Promise<APIGatewayProxyResult> => {
-    // const authHeader = event.headers['Authorization'];
-
-    // if (!authHeader) {
-    //     return {
-    //         statusCode: StatusCodes.UNAUTHORIZED,
-    //         headers: {
-    //             "Content-Type": "application/json",
-    //         },
-    //         body: JSON.stringify({
-    //             message: "Unauthorized: Missing Authorization header"
-    //         }),
-    //     };
-    // }
 
     const item = event;
     if (!item || !item.name) {
@@ -43,6 +30,19 @@ export const handler: Handler = async (event: CreateItemRequest): Promise<APIGat
     // Create a new item
 
     const docId = uuidv4();
+    const nameRegex = /^[a-zA-Z0-9\s-!,.?"åäöÅÄÖ]+$/;
+    if (!nameRegex.test(item.name) || !nameRegex.test(item.description)) {
+        return {
+            statusCode: StatusCodes.BAD_REQUEST,
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                message: "Name/description can only contain alphanumeric characters, spaces, and hyphens."
+            }),
+        };
+    }
+
     const newItem: dbItem = {
         pk: HED_TABLE_NAME,
         sk: docId,

@@ -1,7 +1,7 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult, Handler } from 'aws-lambda';
 import { LambdaClient, InvokeCommand, InvocationType } from "@aws-sdk/client-lambda";
 
-import CreateItemRequest from '../../types/createItemRequest';
+import CreateItemRequest from '../../types/Requests/createItemRequest';
 import { StatusCodes } from '../../statusCodes';
 const lambdaClient = new LambdaClient({});
 
