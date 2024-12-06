@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navbar, Nav, NavItem, Stack } from 'react-bootstrap';
+import { Navbar, Nav, Stack } from 'react-bootstrap';
 
 
 const HED_NavBar: React.FC = () => {

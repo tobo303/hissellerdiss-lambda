@@ -4,9 +4,9 @@ type HEDAxiosMessage = {
     body:       string;
 }
 
-type HEDAxiosErrorResponse = {
-	statusCode: 500;
-}
+// type HEDAxiosErrorResponse = {
+// 	statusCode: 500;
+// }
 
 /* Generic Type (Alias) */
 type HEDAxiosSuccessResponse = {
