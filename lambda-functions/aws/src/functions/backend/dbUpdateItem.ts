@@ -54,6 +54,8 @@ export const handler: Handler = async (event: UpdateItemRequest): Promise<APIGat
     // Update the item
     const docId = existingItem.sk;
     existingItem.votes += item.vote;
+    existingItem.isDeleted = item.isDeleted;
+    
     const result = db.update({
         TableName: DB_NAME,
         Key: {
