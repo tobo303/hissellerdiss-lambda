@@ -30,8 +30,17 @@ provider:
   profile: ${env:USER_PROFILE}
   runtime: nodejs20.x
   architecture: arm64
-  memorySize: 1024
+  memorySize: 512
   httpApi:
+    authorizers:
+      external-api-authorizer:
+        type: request
+        functionName: externalApiAuthorizer
+        resultTtlInSeconds: 300
+        enableSimpleResponses: true
+        payloadVersion: '2.0'
+        identitySource:
+          - $request.header.Authorization        
     cors:
       allowedOrigins: "*"
       allowedHeaders:
@@ -63,12 +72,10 @@ provider:
             - arn:aws:lambda:${env:HISSELLERDISS_REGION}:${env:HISSELLERDISS_ACCOUNT_ID}:function:${self:service}-${sls:stage}-dbReadItems
             - arn:aws:lambda:${env:HISSELLERDISS_REGION}:${env:HISSELLERDISS_ACCOUNT_ID}:function:${self:service}-${sls:stage}-dbReadItemById
             - arn:aws:lambda:${env:HISSELLERDISS_REGION}:${env:HISSELLERDISS_ACCOUNT_ID}:function:${self:service}-${sls:stage}-dbUpdateItem
-  # httpApi:
-  #   authorizers:
-  #     user-authorizer:
-  #       type: request
-  #       functionName: hissUserAuthorizer
-  #       resultTtlInSeconds: ${env:USER_AUTH_TIMEOUT}
+      # user-authorizer:
+      #   type: request
+      #   functionName: hissUserAuthorizer
+      #   resultTtlInSeconds: ${env:USER_AUTH_TIMEOUT}
 
 # lambda functions
 functions:
@@ -106,12 +113,30 @@ functions:
       - httpApi:
           path: /${env:HED_API_PATH}/entries/{id}
           method: put
-
+  createApiKey:
+    role: allowLambdaWriteRights
+    handler: ./src/functions/backend/authorizer/apiCreateKey.handler
+    events:
+      - httpApi:
+          method: post
+          path: /${env:HED_API_PATH}/createApiKey
+  getItemsApi:
+    role: allowLambdaReadRights
+    handler: ./src/functions/get/getItems.handler
+    events:
+      - httpApi:
+          path: /${env:HED_API_PATH}/external/entries
+          method: get
+          authorizer: 
+            name: external-api-authorizer
+  externalApiAuthorizer:
+    role: allowLambdaReadRights
+    handler: ./src/functions/backend/authorizer/apiAuth.handler
 
   # below this line all functions are internal and locked down.
   dbCreateItem:
     role: allowDynamoWriteRights
-    handler: ./src/functions/backend/dbCreateItem.handler
+    handler: ./src/functions/backend/dbCreateItem.createHedItem
   dbReadItems:
     role: allowDynamoReadRights
     handler: ./src/functions/backend/dbReader.getAllItems
@@ -121,6 +146,12 @@ functions:
   dbUpdateItem:
     role: allowDynamoReadWriteRights
     handler: ./src/functions/backend/dbUpdateItem.handler
+  dbGetApiKey:
+    role: allowDynamoReadRights
+    handler: ./src/functions/backend/dbReader.getApiKey
+  dbCreateApiKey:
+    role: allowDynamoWriteRights
+    handler: ./src/functions/backend/dbCreateItem.createApiKey
   # hissUserAuthorizer:
   #   handler: ./src/functions/authorizer/userAuth.handler
 
@@ -152,6 +183,7 @@ resources:
                 Resource:
                   - arn:aws:lambda:${env:HISSELLERDISS_REGION}:${env:HISSELLERDISS_ACCOUNT_ID}:function:${self:service}-${sls:stage}-dbCreateItem
                   - arn:aws:lambda:${env:HISSELLERDISS_REGION}:${env:HISSELLERDISS_ACCOUNT_ID}:function:${self:service}-${sls:stage}-dbUpdateItem
+                  - arn:aws:lambda:${env:HISSELLERDISS_REGION}:${env:HISSELLERDISS_ACCOUNT_ID}:function:${self:service}-${sls:stage}-dbCreateApiKey
           - PolicyName: allowLambdaWriteToLog
             PolicyDocument:
               Version: "2012-10-17"
@@ -187,6 +219,16 @@ resources:
                   - dynamodb:UpdateItem
                 Resource:
                   - Fn::GetAtt: [itemsTable, Arn]
+          - PolicyName: allow-dynamo-w-WriteToLog
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
 
     # Allow access to the lambda function that reads from the database
     allowDynamoReadRights:
@@ -213,6 +255,16 @@ resources:
                   - dynamodb:GetItem
                 Resource:
                   - Fn::GetAtt: [itemsTable, Arn]
+          - PolicyName: allow-dynamo-r-WriteToLog
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
 
     allowDynamoReadWriteRights:
       Type: AWS::IAM::Role
@@ -240,7 +292,7 @@ resources:
                   - dynamodb:UpdateItem
                 Resource:
                   - Fn::GetAtt: [itemsTable, Arn]
-          - PolicyName: allowWriteToLog
+          - PolicyName: allow-dynamo-rw-WriteToLog
             PolicyDocument:
               Version: "2012-10-17"
               Statement:
@@ -278,7 +330,17 @@ resources:
                 Resource:
                   - arn:aws:lambda:${env:HISSELLERDISS_REGION}:${env:HISSELLERDISS_ACCOUNT_ID}:function:${self:service}-${sls:stage}-dbReadItems
                   - arn:aws:lambda:${env:HISSELLERDISS_REGION}:${env:HISSELLERDISS_ACCOUNT_ID}:function:${self:service}-${sls:stage}-dbReadItemById
-
+                  - arn:aws:lambda:${env:HISSELLERDISS_REGION}:${env:HISSELLERDISS_ACCOUNT_ID}:function:${self:service}-${sls:stage}-dbGetApiKey
+          - PolicyName: allow-lambda-r-WriteToLog
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
 
     # DynamoDB Table
     itemsTable:

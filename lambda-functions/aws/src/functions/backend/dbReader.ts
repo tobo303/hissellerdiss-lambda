@@ -1,10 +1,12 @@
 import { APIGatewayProxyResult, Handler } from 'aws-lambda';
 import { DynamoDB } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocument, QueryCommandInput } from '@aws-sdk/lib-dynamodb';
-import { DB_NAME, HED_TABLE_NAME } from '../../globals';
+import { DB_NAME, HED_EXT_API_TABLE, HED_TABLE_NAME } from '../../globals';
 import ItemDto from '../../types/ItemDto';
 import { StatusCodes } from '../../statusCodes';
 import { GetItemByIdRequest } from '../../types/Requests/getItemByIdRequest';
+import { ValidateApiKeyRequest } from '../../types/Requests/validateApiKeyRequest';
+import { ValidateApiKeyResponse } from '../../types/Responses/validationResponse';
 
 const client = new DynamoDB();
 const db = DynamoDBDocument.from(client); // client is DynamoDB client
@@ -88,6 +90,64 @@ export const getItemById: Handler = async (request: GetItemByIdRequest): Promise
         body: JSON.stringify({
             item: item
         }),
+    }
+
+    return response;
+}
+
+export const getApiKey: Handler = async (request: ValidateApiKeyRequest): Promise<APIGatewayProxyResult> => {
+    
+    console.log("Getting api-key with key: ", request.secretKey);
+
+    if (!request.secretKey) {
+        console.log("Missing required fields (secretKey)");
+        return {
+            statusCode: StatusCodes.BAD_REQUEST,
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                message: "Missing required fields (secretKey)",
+            }),
+        };
+    }
+
+    // Skapad med NoSQL Workbench
+    const getApiKeyParams : QueryCommandInput = {
+        TableName: DB_NAME,
+        KeyConditionExpression: "#9d2d0 = :9d2d0 And #9d2d1 = :9d2d1",
+        FilterExpression: "#9d2d2 = :9d2d2",
+        ExpressionAttributeNames: {"#9d2d0":"pk","#9d2d1":"sk","#9d2d2":"isDeleted"},
+        ExpressionAttributeValues: {":9d2d0": HED_EXT_API_TABLE, ":9d2d1": request.secretKey, ":9d2d2": false}
+    }
+
+    const getApiQueryResult = await db.query(getApiKeyParams);
+
+    console.log("Query result: ", getApiQueryResult);
+
+    if (!getApiQueryResult.Items || !getApiQueryResult.Count || getApiQueryResult.Count === 0) {
+        console.log("Unauthorized access");
+        return {
+            statusCode: StatusCodes.UNAUTHORIZED,
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                message: "Unauthorized access"
+            }),
+        }
+    }
+
+    const item = getApiQueryResult.Items[0] as ValidateApiKeyResponse;
+
+    console.log("Api key found: ", item);
+
+    const response: APIGatewayProxyResult = {
+        statusCode: StatusCodes.OK,
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: ''
     }
 
     return response;

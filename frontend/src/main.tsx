@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { makeHours, makeMinutes } from './scripts/time/makeTime';
 import { BrowserRouter } from 'react-router-dom';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import HEDEntriesProvider from './providers/HEDEntriesProvider';
 
 //#region TanStack Query
 const queryClient = new QueryClient({
@@ -21,9 +22,11 @@ const queryClient = new QueryClient({
 createRoot(document.getElementById('root')!).render(
   	<StrictMode>
 		<QueryClientProvider client={queryClient}>
-      		<BrowserRouter>
-        		<HissEllerDissMain />
-      		</BrowserRouter>
+			<BrowserRouter>
+				{/* <HEDEntriesProvider> */}
+					<HissEllerDissMain />
+				{/* </HEDEntriesProvider> */}
+			</BrowserRouter>
 			<ReactQueryDevtools />
 		</QueryClientProvider>
 	</StrictMode>
