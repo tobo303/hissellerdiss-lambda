@@ -60,9 +60,10 @@ export const handler: Handler = async (event: UpdateItemRequest): Promise<APIGat
             pk: HED_TABLE_NAME,
             sk: docId
         },
-        UpdateExpression: "set votes = :votes",
+        UpdateExpression: "set votes = :votes, isDeleted = :isDeleted",
         ExpressionAttributeValues: {
-            ":votes": existingItem.votes
+            ":votes": existingItem.votes,
+            ":isDeleted": existingItem.isDeleted
         }
     });
 

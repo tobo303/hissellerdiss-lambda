@@ -120,6 +120,13 @@ functions:
       - httpApi:
           method: post
           path: /${env:HED_API_PATH}/createApiKey
+  deleteItem:
+    role: allowLambdaWriteRights
+    handler: ./src/functions/post/deleteItem.handler
+    events:
+      - httpApi:
+          method: delete
+          path: /${env:HED_API_PATH}/entries/{id}
   getItemsApi:
     role: allowLambdaReadRights
     handler: ./src/functions/get/getItems.handler
