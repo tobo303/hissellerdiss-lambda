@@ -9,6 +9,7 @@ const lambdaClient = new LambdaClient({});
 export const handler: Handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
     const item = JSON.parse(event.body || '{}') as UpdateItemRequest;
     item.id = event.pathParameters?.id || "";
+    item.isDeleted = item.isDeleted || false;
     
     console.log("patchItem function invoked with item: ", item);
 
