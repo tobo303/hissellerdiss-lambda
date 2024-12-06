@@ -2,8 +2,13 @@ import { APIGatewayRequestAuthorizerEventV2, APIGatewaySimpleAuthorizerResult, H
 import { LambdaClient, InvokeCommand, InvocationType } from "@aws-sdk/client-lambda";
 import { ValidateApiKeyRequest } from '../../../types/Requests/validateApiKeyRequest';
 import { ValidateApiKeyResponse } from '../../../types/Responses/validationResponse';
+import { EventBridgeClient, PutEventsCommand } from "@aws-sdk/client-eventbridge";
 
 const lambdaClient = new LambdaClient({
+    region: 'eu-north-1'
+});
+
+const eventBridgeClient = new EventBridgeClient({
     region: 'eu-north-1'
 });
 
@@ -44,6 +49,19 @@ export const handler: Handler = async (event: APIGatewayRequestAuthorizerEventV2
 
     const apiResponse : ValidateApiKeyResponse = JSON.parse(Buffer.from(response.Payload).toString());
     // console.log("RAW BUFFER:", JSON.parse(Buffer.from(response.Payload).toString()));
+
+    const eventBusParams = {
+        Entries: [
+            {
+                Source: 'apiAuth',
+                DetailType: 'API Key Validation',
+                Detail: JSON.stringify({ message: 'API Key Validated: ' + apiRequest.secretKey + ' ' + (apiResponse.statusCode === 200)}),
+                EventBusName: 'hed-log',
+            },
+        ],
+    };
+
+    await eventBridgeClient.send(new PutEventsCommand(eventBusParams));
 
     return {
         isAuthorized: apiResponse.statusCode === 200,

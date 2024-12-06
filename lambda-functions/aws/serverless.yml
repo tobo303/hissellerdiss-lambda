@@ -133,6 +133,16 @@ functions:
     role: allowLambdaReadRights
     handler: ./src/functions/backend/authorizer/apiAuth.handler
 
+  eventBridgeLogger:
+    role: allowLambdaReadRights
+    handler: ./src/functions/backend/eventBridge/eventLogger.handler
+    events:
+      - eventBridge:
+          eventBus: hed-log
+          pattern:
+            source:
+              - "apiAuth"
+
   # below this line all functions are internal and locked down.
   dbCreateItem:
     role: allowDynamoWriteRights
@@ -340,6 +350,14 @@ resources:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
+                Resource: "*"
+          - PolicyName: allow-lambda-r-WriteToEventBridge
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                Effect: Allow
+                Action:
+                  - events:PutEvents 
                 Resource: "*"
 
     # DynamoDB Table
